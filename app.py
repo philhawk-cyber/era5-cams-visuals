@@ -129,12 +129,49 @@ def make_surface(month_idx):
     )
 
 # ---------------------------
-# 🎞️ アニメーションフレーム生成
+# 🎚️ 月スライダーで切替（再生なし）
 # ---------------------------
-frames = [
-    go.Frame(name=f"Month {i+1}", data=[make_surface(i), coast_trace])
-    for i in range(co2.sizes[time_key])
-]
+month_idx = st.slider("表示月 (1–12)", 1, co2.sizes[time_key], 1, step=1) - 1
+
+fig = go.Figure(data=[make_surface(month_idx), coast_trace])
+
+fig.update_layout(
+    title=f"🌍 CAMS Global CO₂ Concentration — Month {month_idx+1}",
+    width=1100, height=750,
+    scene=dict(
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False),
+        zaxis=dict(visible=False),
+        aspectmode="data",
+        bgcolor="white",
+        camera=dict(
+            up=dict(x=0, y=0, z=1),
+            center=dict(x=0, y=0, z=0),
+            eye=dict(x=1.5, y=1.5, z=1.2)
+        )
+    ),
+    margin=dict(l=40, r=40, t=60, b=20)
+)
+
+# カラーバーを統一
+fig.update_traces(
+    colorbar_title="CO₂ (ppm)",
+    selector=dict(type="surface"),
+    colorbar_len=0.7,
+    colorbar_x=1.05
+)
+
+# 出典ラベル
+fig.add_annotation(
+    text="Data Source: Copernicus Atmosphere Monitoring Service (CAMS), ECMWF (2020)",
+    xref="paper", yref="paper",
+    x=0.5, y=-0.08, showarrow=False,
+    font=dict(size=11, color="gray"),
+    align="center"
+)
+
+# 表示
+st.plotly_chart(fig, use_container_width=True)
 
 # ---------------------------
 # 📊 図全体設定（カメラ固定＋スライダー付き）
