@@ -1,5 +1,8 @@
 streamlit
 xarray
-netCDF4
 numpy
 plotly
+geopandas
+shapely
+fiona
+pyproj
