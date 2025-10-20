@@ -45,28 +45,35 @@ else:
     frame = da
     time_label = "Static data"
 
-# 欠損値を補完
+# 欠損値を補完して2D化
 data_2d = np.nan_to_num(frame.values)
+
+# 転置（lonがx軸, latがy軸に合うように）
+data_2d = np.transpose(data_2d)
 
 # カラースケール選択
 color_scale = st.sidebar.selectbox("Color scale", ["Viridis", "Plasma", "Cividis", "Inferno"])
 
+# 緯度・経度配列を取得
+lons = frame[lon_name].values
+lats = frame[lat_name].values
+
 # 描画
 fig = px.imshow(
     data_2d,
-    x=frame[lon_name],
-    y=frame[lat_name],
+    x=lons,
+    y=lats,
     origin="lower",
     color_continuous_scale=color_scale,
     aspect="auto",
     labels={"color": f"{da.name}"},
 )
+
 fig.update_layout(
     title=f"CAMS CO₂ Concentration — {time_label}",
     coloraxis_colorbar=dict(title="ppm"),
 )
 
 st.plotly_chart(fig, use_container_width=True)
-
 st.markdown("---")
 st.caption("Data source: Copernicus Atmosphere Monitoring Service (CAMS) — ECMWF.")
