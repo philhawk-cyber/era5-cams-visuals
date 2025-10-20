@@ -140,6 +140,27 @@ frames = [
 # ---------------------------
 fig = go.Figure(data=[make_surface(0), coast_trace], frames=frames)
 
+# 再生・一時停止ボタン + スライダー設定
+play_pause_buttons = [
+    dict(label="▶ 再生", method="animate",
+         args=[None, {"frame": {"duration": 700, "redraw": True},
+                      "fromcurrent": True, "transition": {"duration": 0}}]),
+    dict(label="⏸ 一時停止", method="animate",
+         args=[[None], {"mode": "immediate",
+                        "frame": {"duration": 0, "redraw": False},
+                        "transition": {"duration": 0}}])
+]
+
+# スライダー設定（12か月分）
+slider_steps = [
+    dict(method="animate",
+         args=[[f"Month {i+1}"],
+               {"mode": "immediate",
+                "frame": {"duration": 0, "redraw": True},
+                "transition": {"duration": 0}}],
+         label=f"{i+1:02d}") for i in range(co2.sizes[time_key])
+]
+
 fig.update_layout(
     title="🌍 CAMS Global CO₂ Distribution (2020)",
     width=1100, height=750,
@@ -153,23 +174,31 @@ fig.update_layout(
     margin=dict(l=40, r=40, t=60, b=20),
     updatemenus=[dict(
         type="buttons",
-        x=0.01, y=0.01, xanchor="left", yanchor="bottom",
-        buttons=[
-            dict(label="▶ 再生", method="animate",
-                 args=[None, {"frame": {"duration": 700, "redraw": True},
-                              "fromcurrent": True, "transition": {"duration": 0}}]),
-            dict(label="⏸ 一時停止", method="animate",
-                 args=[[None], {"mode": "immediate",
-                                "frame": {"duration": 0, "redraw": False},
-                                "transition": {"duration": 0}}]),
-        ]
+        direction="left",
+        pad=dict(r=10, t=50),
+        showactive=False,
+        x=0.1, y=0,
+        xanchor="right", yanchor="top",
+        buttons=play_pause_buttons
+    )],
+    sliders=[dict(
+        active=0,
+        pad=dict(t=30, b=10),
+        x=0.1, y=0,
+        xanchor="left", yanchor="top",
+        len=0.8,
+        currentvalue=dict(
+            prefix="Month ",
+            font=dict(size=14, color="black", family="Segoe UI")
+        ),
+        steps=slider_steps
     )],
 )
 
 fig.add_annotation(
     text="Source: Copernicus Atmosphere Monitoring Service (CAMS), ECMWF",
     xref="paper", yref="paper",
-    x=0, y=-0.05, showarrow=False, font=dict(size=10, color="gray")
+    x=0, y=-0.08, showarrow=False, font=dict(size=10, color="gray")
 )
 
 # ---------------------------
