@@ -173,69 +173,6 @@ fig.add_annotation(
 # 表示
 st.plotly_chart(fig, use_container_width=True)
 
-# ---------------------------
-# 📊 図全体設定（カメラ固定＋スライダー付き）
-# ---------------------------
-fig = go.Figure(data=[make_surface(0), coast_trace], frames=frames)
-
-play_pause_buttons = [
-    dict(label="▶ 再生", method="animate",
-         args=[None, {"frame": {"duration": 700, "redraw": True},
-                      "fromcurrent": True, "transition": {"duration": 0}}]),
-    dict(label="⏸ 一時停止", method="animate",
-         args=[[None], {"mode": "immediate",
-                        "frame": {"duration": 0, "redraw": False},
-                        "transition": {"duration": 0}}])
-]
-
-slider_steps = [
-    dict(method="animate",
-         args=[[f"Month {i+1}"],
-               {"mode": "immediate",
-                "frame": {"duration": 0, "redraw": True},
-                "transition": {"duration": 0}}],
-         label=f"{i+1:02d}") for i in range(co2.sizes[time_key])
-]
-
-fig.update_layout(
-    title="🌍 CAMS Global CO₂ Distribution (2020)",
-    width=1100, height=750,
-    scene=dict(
-        xaxis=dict(visible=False),
-        yaxis=dict(visible=False),
-        zaxis=dict(visible=False),
-        aspectmode="data",
-        bgcolor="white",
-        camera=dict(
-            up=dict(x=0, y=0, z=1),
-            center=dict(x=0, y=0, z=0),
-            eye=dict(x=1.5, y=1.5, z=1.2)  # ← ドラッグ後の視点を維持
-        )
-    ),
-    margin=dict(l=40, r=40, t=60, b=20),
-    updatemenus=[dict(
-        type="buttons",
-        direction="left",
-        pad=dict(r=10, t=50),
-        showactive=False,
-        x=0.1, y=0,
-        xanchor="right", yanchor="top",
-        buttons=play_pause_buttons
-    )],
-    sliders=[dict(
-        active=0,
-        pad=dict(t=30, b=10),
-        x=0.1, y=0,
-        xanchor="left", yanchor="top",
-        len=0.8,
-        currentvalue=dict(
-            prefix="Month ",
-            font=dict(size=14, color="black", family="Segoe UI")
-        ),
-        steps=slider_steps
-    )],
-)
-
 # カラーバー全体の外観を調整
 fig.update_traces(
     colorbar_title="CO₂ (ppm)",
