@@ -1,4 +1,4 @@
-# === CAMS CO₂ 2020 Interactive Globe (Streamlit Cloud 最終安定・プリセット視点版) ===
+# === CAMS CO₂ 2020 Interactive Globe (Streamlit Cloud 最終安定版・カメラ修正版) ===
 import streamlit as st
 import numpy as np
 import xarray as xr
@@ -21,7 +21,7 @@ st.markdown("""
 # ---------------------------
 @st.cache_data
 def load_data():
-    file_path = "data/fd9c5180844360480e5575ed69dc8799.nc"  # 相対パス
+    file_path = "data/fd9c5180844360480e5575ed69dc8799.nc"
     ds = xr.open_dataset(file_path)
 
     # CO₂ 変数を検出
@@ -32,10 +32,9 @@ def load_data():
     else:
         raise KeyError("❌ CO₂変数が見つかりません（co2 / xco2 / tcco2）")
 
-    # 軸名の違いを吸収
     time_key = "time" if "time" in ds.coords else "valid_time"
-    lat_key  = "latitude" if "latitude" in ds.coords else "lat"
-    lon_key  = "longitude" if "longitude" in ds.coords else "lon"
+    lat_key = "latitude" if "latitude" in ds.coords else "lat"
+    lon_key = "longitude" if "longitude" in ds.coords else "lon"
 
     return ds, co2, time_key, lat_key, lon_key
 
@@ -49,8 +48,8 @@ except Exception as e:
 # 🧭 座標情報 & 球面座標
 # ---------------------------
 times = ds[time_key]
-lats  = ds[lat_key]
-lons  = ds[lon_key]
+lats = ds[lat_key]
+lons = ds[lon_key]
 
 lon_grid, lat_grid = np.meshgrid(lons, lats)
 X = np.cos(np.deg2rad(lat_grid)) * np.cos(np.deg2rad(lon_grid))
@@ -85,19 +84,17 @@ def load_coastline():
                 x, y = poly.exterior.xy
                 coast_x += list(x) + [None]
                 coast_y += list(y) + [None]
-    # numpy 変換（None→NaN）
     coast_x = np.array([np.nan if x is None else x for x in coast_x], dtype=float)
     coast_y = np.array([np.nan if y is None else y for y in coast_y], dtype=float)
     return coast_x, coast_y
 
 coast_x, coast_y = load_coastline()
-valid_mask = np.isfinite(coast_x) & np.isfinite(coast_y)
-coast_x_valid = coast_x[valid_mask]
-coast_y_valid = coast_y[valid_mask]
+mask = np.isfinite(coast_x) & np.isfinite(coast_y)
+coast_x, coast_y = coast_x[mask], coast_y[mask]
 
-coast_X = np.cos(np.deg2rad(coast_y_valid)) * np.cos(np.deg2rad(coast_x_valid))
-coast_Y = np.cos(np.deg2rad(coast_y_valid)) * np.sin(np.deg2rad(coast_x_valid))
-coast_Z = np.sin(np.deg2rad(coast_y_valid))
+coast_X = np.cos(np.deg2rad(coast_y)) * np.cos(np.deg2rad(coast_x))
+coast_Y = np.cos(np.deg2rad(coast_y)) * np.sin(np.deg2rad(coast_x))
+coast_Z = np.sin(np.deg2rad(coast_y))
 
 coast_trace = go.Scatter3d(
     x=coast_X, y=coast_Y, z=coast_Z,
@@ -106,33 +103,24 @@ coast_trace = go.Scatter3d(
 )
 
 # ---------------------------
-# 🎚️ UI（サイドバー）: カラースケール & 視点プリセット
+# 🎨 カラースケールとプリセット設定
 # ---------------------------
 colorscale = st.sidebar.selectbox("カラースケール", ["Turbo", "Viridis", "Plasma", "RdYlGn_r"])
-
 view_option = st.sidebar.selectbox(
     "視点プリセット",
     ["Global (Default)", "Asia-Pacific", "Europe-Africa", "Americas"]
 )
 
-# 各プリセットに応じたカメラ位置（eye）
+# カメラ設定（調整済み）
 camera_presets = {
-    # 地球全体をやや拡大
-    "Global (Default)": dict(eye=dict(x=1.1, y=1.1, z=0.9)),
-
-    # アジア太平洋（現状維持）
-    "Asia-Pacific": dict(eye=dict(x=-2.0, y=2.0, z=1.0)),
-
-    # ヨーロッパ・アフリカ：サウジ中心
-    "Europe-Africa": dict(eye=dict(x=-1.2, y=2.0, z=1.0)),
-
-    # アメリカ大陸：メキシコ中心
-    "Americas": dict(eye=dict(x=2.5, y=-1.0, z=1.0)),
+    "Global (Default)": dict(eye=dict(x=1.1, y=1.1, z=0.9)),   # 統一拡大
+    "Asia-Pacific":     dict(eye=dict(x=-2.0, y=2.0, z=1.0)),  # OK
+    "Europe-Africa":    dict(eye=dict(x=-1.3, y=2.0, z=1.0)),  # サウジ中心
+    "Americas":         dict(eye=dict(x=2.5, y=-1.1, z=1.0)),  # メキシコ中心
 }
-
 camera_eye = camera_presets[view_option]["eye"]
 
-# カラーレンジ（外れ値に頑健）
+# カラーレンジ
 vmin, vmax = np.nanpercentile(co2.values, [2, 98])
 
 # ---------------------------
@@ -152,11 +140,11 @@ def make_surface(month_idx: int) -> go.Surface:
     )
 
 # ---------------------------
-# 📅 月スライダー（再生なし・視点はプリセットで初期化）
+# 🎚️ 月スライダー＋レイアウト更新
 # ---------------------------
 month_idx = st.slider("表示月 (1–12)", 1, co2.sizes[time_key], 1, step=1) - 1
-
 fig = go.Figure(data=[make_surface(month_idx), coast_trace])
+
 fig.update_layout(
     title=f"🌍 CAMS Global CO₂ Concentration — Month {month_idx+1}",
     width=1100, height=750,
@@ -166,16 +154,17 @@ fig.update_layout(
         zaxis=dict(visible=False),
         aspectmode="data",
         bgcolor="white",
-        camera=dict(  # ← プリセットを初期視点に適用（回転・ズーム操作はそのまま可）
+        camera=dict(
             up=dict(x=0, y=0, z=1),
             center=dict(x=0, y=0, z=0),
             eye=camera_eye
         )
     ),
-    margin=dict(l=40, r=40, t=60, b=20)
+    margin=dict(l=40, r=40, t=60, b=20),
+    uirevision=view_option  # ← カメラを強制再適用
 )
 
-# カラーバー調整（全 Surface に適用）
+# カラーバー
 fig.update_traces(
     colorbar_title="CO₂ (ppm)",
     selector=dict(type="surface"),
@@ -192,5 +181,7 @@ fig.add_annotation(
     align="center"
 )
 
-# 表示（1回だけ）
+# ---------------------------
+# 📺 表示
+# ---------------------------
 st.plotly_chart(fig, use_container_width=True)
