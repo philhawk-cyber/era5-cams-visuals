@@ -1,13 +1,10 @@
-# === CAMS CO₂ 2020 Interactive Globe (Streamlit Cloud 最終安定版・カメラ修正版) ===
+# === CAMS CO₂ 2020 Interactive Globe (Streamlit Cloud 安定＋カメラ位置修正版) ===
 import streamlit as st
 import numpy as np
 import xarray as xr
 import plotly.graph_objects as go
 import geopandas as gpd
 
-# ---------------------------
-# 🌍 Streamlit ページ設定
-# ---------------------------
 st.set_page_config(page_title="CAMS CO₂ 3D Globe", layout="wide")
 
 st.title("🌍 CAMS Global CO₂ Distribution (2020)")
@@ -16,59 +13,30 @@ st.markdown("""
 2020年の月別 CO₂ 濃度を地球儀上で可視化します。
 """)
 
-# ---------------------------
-# 📦 データ読み込み関数（キャッシュ）
-# ---------------------------
 @st.cache_data
 def load_data():
-    file_path = "data/fd9c5180844360480e5575ed69dc8799.nc"
-    ds = xr.open_dataset(file_path)
-
-    # CO₂ 変数を検出
+    ds = xr.open_dataset("data/fd9c5180844360480e5575ed69dc8799.nc")
     for varname in ["co2", "xco2", "tcco2"]:
         if varname in ds.data_vars:
             co2 = ds[varname]
             break
     else:
-        raise KeyError("❌ CO₂変数が見つかりません（co2 / xco2 / tcco2）")
+        raise KeyError("❌ CO₂変数が見つかりません")
 
     time_key = "time" if "time" in ds.coords else "valid_time"
     lat_key = "latitude" if "latitude" in ds.coords else "lat"
     lon_key = "longitude" if "longitude" in ds.coords else "lon"
-
     return ds, co2, time_key, lat_key, lon_key
 
-try:
-    ds, co2, time_key, lat_key, lon_key = load_data()
-except Exception as e:
-    st.error(f"NetCDF読み込みエラー: {e}")
-    st.stop()
+ds, co2, time_key, lat_key, lon_key = load_data()
 
-# ---------------------------
-# 🧭 座標情報 & 球面座標
-# ---------------------------
-times = ds[time_key]
-lats = ds[lat_key]
-lons = ds[lon_key]
-
+times, lats, lons = ds[time_key], ds[lat_key], ds[lon_key]
 lon_grid, lat_grid = np.meshgrid(lons, lats)
 X = np.cos(np.deg2rad(lat_grid)) * np.cos(np.deg2rad(lon_grid))
 Y = np.cos(np.deg2rad(lat_grid)) * np.sin(np.deg2rad(lon_grid))
 Z = np.sin(np.deg2rad(lat_grid))
 
-# 経度の閉鎖処理（縦線除去）
-if not np.isclose(lons[-1], 360.0, atol=0.5):
-    extra_slice = co2.isel({lon_key: 0}).copy(deep=True)
-    co2 = xr.concat([co2, extra_slice], dim=lon_key)
-    lons_new = np.linspace(0, 360, co2.sizes[lon_key])
-    co2 = co2.assign_coords({lon_key: lons_new})
-    co2_vals = co2.values
-    co2_vals[..., -1] = (co2_vals[..., -2] + co2_vals[..., 0]) / 2
-    co2[:] = co2_vals
-
-# ---------------------------
-# 🌐 海岸線データ（GeoJSON → 球面座標）
-# ---------------------------
+# ---- 海岸線データ ----
 @st.cache_data
 def load_coastline():
     url = "https://github.com/nvkelso/natural-earth-vector/raw/master/geojson/ne_110m_admin_0_countries.geojson"
@@ -84,70 +52,54 @@ def load_coastline():
                 x, y = poly.exterior.xy
                 coast_x += list(x) + [None]
                 coast_y += list(y) + [None]
-    coast_x = np.array([np.nan if x is None else x for x in coast_x], dtype=float)
-    coast_y = np.array([np.nan if y is None else y for y in coast_y], dtype=float)
+    coast_x = np.array([np.nan if x is None else x for x in coast_x])
+    coast_y = np.array([np.nan if y is None else y for y in coast_y])
     return coast_x, coast_y
 
-coast_x, coast_y = load_coastline()
-mask = np.isfinite(coast_x) & np.isfinite(coast_y)
-coast_x, coast_y = coast_x[mask], coast_y[mask]
+cx, cy = load_coastline()
+mask = np.isfinite(cx) & np.isfinite(cy)
+cx, cy = cx[mask], cy[mask]
+coast_X = np.cos(np.deg2rad(cy)) * np.cos(np.deg2rad(cx))
+coast_Y = np.cos(np.deg2rad(cy)) * np.sin(np.deg2rad(cx))
+coast_Z = np.sin(np.deg2rad(cy))
 
-coast_X = np.cos(np.deg2rad(coast_y)) * np.cos(np.deg2rad(coast_x))
-coast_Y = np.cos(np.deg2rad(coast_y)) * np.sin(np.deg2rad(coast_x))
-coast_Z = np.sin(np.deg2rad(coast_y))
+coast_trace = go.Scatter3d(x=coast_X, y=coast_Y, z=coast_Z,
+    mode="lines", line=dict(color="black", width=0.8), showlegend=False)
 
-coast_trace = go.Scatter3d(
-    x=coast_X, y=coast_Y, z=coast_Z,
-    mode="lines", line=dict(color="black", width=0.8),
-    showlegend=False
-)
-
-# ---------------------------
-# 🎨 カラースケールとプリセット設定
-# ---------------------------
+# ---- カラースケール・カメラ設定 ----
 colorscale = st.sidebar.selectbox("カラースケール", ["Turbo", "Viridis", "Plasma", "RdYlGn_r"])
-view_option = st.sidebar.selectbox(
-    "視点プリセット",
-    ["Global (Default)", "Asia-Pacific", "Europe-Africa", "Americas"]
-)
+view_option = st.sidebar.selectbox("視点プリセット", ["Global (Default)", "Asia-Pacific", "Europe-Africa", "Americas"])
 
-# カメラ設定（調整済み）
 camera_presets = {
-    "Global (Default)": dict(eye=dict(x=1.1, y=1.1, z=0.9)),   # 統一拡大
-    "Asia-Pacific":     dict(eye=dict(x=-2.0, y=2.0, z=1.0)),  # OK
-    "Europe-Africa":    dict(eye=dict(x=-1.3, y=2.0, z=1.0)),  # サウジ中心
-    "Americas":         dict(eye=dict(x=2.5, y=-1.1, z=1.0)),  # メキシコ中心
+    "Global (Default)": dict(eye=dict(x=1.1, y=1.1, z=0.9)),
+    "Asia-Pacific":     dict(eye=dict(x=-2.0, y=2.0, z=1.0)),
+    "Europe-Africa":    dict(eye=dict(x=-1.3, y=2.0, z=1.0)),
+    "Americas":         dict(eye=dict(x=2.5, y=-1.1, z=1.0)),
 }
 camera_eye = camera_presets[view_option]["eye"]
 
-# カラーレンジ
 vmin, vmax = np.nanpercentile(co2.values, [2, 98])
 
-# ---------------------------
-# 🌫️ Surface 生成関数
-# ---------------------------
-def make_surface(month_idx: int) -> go.Surface:
-    co2_frame = co2.isel({time_key: month_idx}).values
+def make_surface(i):
+    frame = co2.isel({time_key: i}).values
     return go.Surface(
         x=X, y=Y, z=Z,
-        surfacecolor=co2_frame,
+        surfacecolor=frame,
         colorscale=colorscale,
         cmin=vmin, cmax=vmax,
         showscale=True,
-        lighting=dict(ambient=1.0, diffuse=0.0, specular=0.0,
-                      roughness=1.0, fresnel=0.0),
+        lighting=dict(ambient=1.0, diffuse=0.0),
         opacity=1.0
     )
 
-# ---------------------------
-# 🎚️ 月スライダー＋レイアウト更新
-# ---------------------------
+# ---- スライダー操作 ----
 month_idx = st.slider("表示月 (1–12)", 1, co2.sizes[time_key], 1, step=1) - 1
 fig = go.Figure(data=[make_surface(month_idx), coast_trace])
 
 fig.update_layout(
     title=f"🌍 CAMS Global CO₂ Concentration — Month {month_idx+1}",
     width=1100, height=750,
+    margin=dict(l=40, r=40, t=60, b=20),
     scene=dict(
         xaxis=dict(visible=False),
         yaxis=dict(visible=False),
@@ -160,28 +112,18 @@ fig.update_layout(
             eye=camera_eye
         )
     ),
-    margin=dict(l=40, r=40, t=60, b=20),
-    uirevision=view_option  # ← カメラを強制再適用
+    uirevision=view_option  # ← カメラを確実に反映
 )
 
-# カラーバー
-fig.update_traces(
-    colorbar_title="CO₂ (ppm)",
-    selector=dict(type="surface"),
-    colorbar_len=0.7,
-    colorbar_x=1.05
-)
+# ---- カラーバー & 出典 ----
+fig.update_traces(colorbar_title="CO₂ (ppm)", selector=dict(type="surface"),
+                  colorbar_len=0.7, colorbar_x=1.05)
 
-# 出典ラベル
 fig.add_annotation(
     text="Data Source: Copernicus Atmosphere Monitoring Service (CAMS), ECMWF (2020)",
-    xref="paper", yref="paper",
-    x=0.5, y=-0.08, showarrow=False,
-    font=dict(size=11, color="gray"),
-    align="center"
+    xref="paper", yref="paper", x=0.5, y=-0.08, showarrow=False,
+    font=dict(size=11, color="gray"), align="center"
 )
 
-# ---------------------------
-# 📺 表示
-# ---------------------------
+# ---- 表示 ----
 st.plotly_chart(fig, use_container_width=True)
