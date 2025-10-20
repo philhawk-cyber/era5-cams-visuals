@@ -121,6 +121,7 @@ camera_presets = {
     "Europe-Africa":    dict(eye=dict(x=0.0,  y= 2.0,  z=1.2)),
     "Americas":         dict(eye=dict(x=2.0,  y=-1.5, z=1.2)),
 }
+
 camera_eye = camera_presets[view_option]["eye"]
 
 # カラーレンジ（外れ値に頑健）
