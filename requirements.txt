@@ -1,8 +1,9 @@
-streamlit
-plotly
 xarray
-geopandas
+netCDF4
 numpy
 pandas
+matplotlib
+plotly
+cartopy
+geopandas
 requests
-netCDF4
