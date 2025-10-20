@@ -117,17 +117,17 @@ view_option = st.sidebar.selectbox(
 
 # 各プリセットに応じたカメラ位置（eye）
 camera_presets = {
-    # グローバルビュー（地球をやや近めに）
-    "Global (Default)": dict(eye=dict(x=1.3,  y=1.3,  z=1.1)),
+    # 地球全体をやや拡大
+    "Global (Default)": dict(eye=dict(x=1.1, y=1.1, z=0.9)),
 
-    # アジア太平洋（そのままでOK）
-    "Asia-Pacific":     dict(eye=dict(x=-2.0, y=2.0, z=1.0)),
+    # アジア太平洋（現状維持）
+    "Asia-Pacific": dict(eye=dict(x=-2.0, y=2.0, z=1.0)),
 
-    # ヨーロッパ・アフリカ（少し西へ＝xを負方向へ）
-    "Europe-Africa":    dict(eye=dict(x=-0.8,  y=2.0,  z=1.1)),
+    # ヨーロッパ・アフリカ：サウジ中心
+    "Europe-Africa": dict(eye=dict(x=-1.2, y=2.0, z=1.0)),
 
-    # アメリカ大陸（もう少し西へ＝xを大きく、yをわずかに負）
-    "Americas":         dict(eye=dict(x=2.3,  y=-1.2, z=1.1)),
+    # アメリカ大陸：メキシコ中心
+    "Americas": dict(eye=dict(x=2.5, y=-1.0, z=1.0)),
 }
 
 camera_eye = camera_presets[view_option]["eye"]
