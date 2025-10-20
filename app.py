@@ -1,4 +1,4 @@
-# === CAMS CO₂ 2020 Interactive Globe (Streamlit Cloud 完全安定版) ===
+# === CAMS CO₂ 2020 Interactive Globe (Streamlit Cloud 完全安定・改良版) ===
 import streamlit as st
 import numpy as np
 import xarray as xr
@@ -113,7 +113,7 @@ vmin, vmax = np.nanpercentile(co2.values, [2, 98])
 colorscale = st.sidebar.selectbox("カラースケール", ["Turbo", "Viridis", "Plasma", "RdYlGn_r"])
 
 # ---------------------------
-# 🌫️ Surface生成関数
+# 🌫️ Surface生成関数（カラーバー付き）
 # ---------------------------
 def make_surface(month_idx):
     co2_frame = co2.isel({time_key: month_idx}).values
@@ -122,7 +122,14 @@ def make_surface(month_idx):
         surfacecolor=co2_frame,
         colorscale=colorscale,
         cmin=vmin, cmax=vmax,
-        showscale=False,
+        showscale=True,
+        colorbar=dict(
+            title="CO₂ (ppm)",
+            titleside="right",
+            tickfont=dict(size=10),
+            len=0.7,
+            x=1.05
+        ),
         lighting=dict(ambient=1.0, diffuse=0.0, specular=0.0, roughness=1.0, fresnel=0.0),
         opacity=1.0
     )
@@ -136,11 +143,10 @@ frames = [
 ]
 
 # ---------------------------
-# 📊 図全体設定
+# 📊 図全体設定（カメラ固定＋スライダー付き）
 # ---------------------------
 fig = go.Figure(data=[make_surface(0), coast_trace], frames=frames)
 
-# 再生・一時停止ボタン + スライダー設定
 play_pause_buttons = [
     dict(label="▶ 再生", method="animate",
          args=[None, {"frame": {"duration": 700, "redraw": True},
@@ -151,7 +157,6 @@ play_pause_buttons = [
                         "transition": {"duration": 0}}])
 ]
 
-# スライダー設定（12か月分）
 slider_steps = [
     dict(method="animate",
          args=[[f"Month {i+1}"],
@@ -169,7 +174,12 @@ fig.update_layout(
         yaxis=dict(visible=False),
         zaxis=dict(visible=False),
         aspectmode="data",
-        bgcolor="white"
+        bgcolor="white",
+        camera=dict(
+            up=dict(x=0, y=0, z=1),
+            center=dict(x=0, y=0, z=0),
+            eye=dict(x=1.5, y=1.5, z=1.2)  # ← ドラッグ後の視点を維持
+        )
     ),
     margin=dict(l=40, r=40, t=60, b=20),
     updatemenus=[dict(
@@ -195,10 +205,15 @@ fig.update_layout(
     )],
 )
 
+# ---------------------------
+# 🧾 出典ラベル（中央下部）
+# ---------------------------
 fig.add_annotation(
-    text="Source: Copernicus Atmosphere Monitoring Service (CAMS), ECMWF",
+    text="Data Source: Copernicus Atmosphere Monitoring Service (CAMS), ECMWF (2020)",
     xref="paper", yref="paper",
-    x=0, y=-0.08, showarrow=False, font=dict(size=10, color="gray")
+    x=0.5, y=-0.08, showarrow=False,
+    font=dict(size=11, color="gray"),
+    align="center"
 )
 
 # ---------------------------
