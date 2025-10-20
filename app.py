@@ -122,4 +122,5 @@ fig.add_annotation(
     showarrow=False, font=dict(size=11, color="gray"), align="center"
 )
 
-st.plotly_chart(fig, use_container_width=True)
+# 変更後（カメラ更新を強制）
+st.plotly_chart(fig, use_container_width=True, key=f"{view_option}_{month_idx}")
