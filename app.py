@@ -132,11 +132,10 @@ scene_kwargs = dict(
 )
 
 if "camera_initialized" not in st.session_state:
-    # 初回のみ：少し大きめに見える初期視点（好みで微調整OK）
     scene_kwargs["camera"] = dict(
         up=dict(x=0, y=0, z=1),
         center=dict(x=0, y=0, z=0),
-        eye=dict(x=1.8, y=1.8, z=1.4),
+        eye=dict(x=1.2, y=1.2, z=0.9),  # ← 近づく（ズームイン）
     )
     st.session_state.camera_initialized = True
 # 2回目以降は camera を渡さない（→ ユーザー操作を完全保持）
