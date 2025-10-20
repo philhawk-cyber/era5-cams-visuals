@@ -1,4 +1,4 @@
-# === CAMS CO₂ 2020 Interactive Globe (Streamlit Cloud 完全安定・改良版) ===
+# === CAMS CO₂ 2020 Interactive Globe (Streamlit Cloud 最終安定・統合版) ===
 import streamlit as st
 import numpy as np
 import xarray as xr
@@ -113,7 +113,7 @@ vmin, vmax = np.nanpercentile(co2.values, [2, 98])
 colorscale = st.sidebar.selectbox("カラースケール", ["Turbo", "Viridis", "Plasma", "RdYlGn_r"])
 
 # ---------------------------
-# 🌫️ Surface生成関数（カラーバー付き）
+# 🌫️ Surface生成関数
 # ---------------------------
 def make_surface(month_idx):
     co2_frame = co2.isel({time_key: month_idx}).values
@@ -122,14 +122,14 @@ def make_surface(month_idx):
         surfacecolor=co2_frame,
         colorscale=colorscale,
         cmin=vmin, cmax=vmax,
-        showscale=True,   # ← カラーバーはON
+        showscale=True,
         lighting=dict(ambient=1.0, diffuse=0.0, specular=0.0,
                       roughness=1.0, fresnel=0.0),
         opacity=1.0
     )
 
 # ---------------------------
-# 🎚️ 月スライダーで切替（再生なし）
+# 🎚️ 月スライダーで切替（再生なし・視点保持）
 # ---------------------------
 month_idx = st.slider("表示月 (1–12)", 1, co2.sizes[time_key], 1, step=1) - 1
 
@@ -153,7 +153,7 @@ fig.update_layout(
     margin=dict(l=40, r=40, t=60, b=20)
 )
 
-# カラーバーを統一
+# カラーバー調整
 fig.update_traces(
     colorbar_title="CO₂ (ppm)",
     selector=dict(type="surface"),
@@ -170,29 +170,5 @@ fig.add_annotation(
     align="center"
 )
 
-# 表示
-st.plotly_chart(fig, use_container_width=True)
-
-# カラーバー全体の外観を調整
-fig.update_traces(
-    colorbar_title="CO₂ (ppm)",
-    selector=dict(type="surface"),
-    colorbar_len=0.7,
-    colorbar_x=1.05
-)
-
-# ---------------------------
-# 🧾 出典ラベル（中央下部）
-# ---------------------------
-fig.add_annotation(
-    text="Data Source: Copernicus Atmosphere Monitoring Service (CAMS), ECMWF (2020)",
-    xref="paper", yref="paper",
-    x=0.5, y=-0.08, showarrow=False,
-    font=dict(size=11, color="gray"),
-    align="center"
-)
-
-# ---------------------------
-# 📺 Streamlitで表示
-# ---------------------------
+# 表示（1回だけ）
 st.plotly_chart(fig, use_container_width=True)
