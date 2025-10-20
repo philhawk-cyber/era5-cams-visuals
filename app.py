@@ -1,4 +1,4 @@
-# === CAMS CO₂ 2020 Interactive Globe (Streamlit Cloud 最終安定・統合版) ===
+# === CAMS CO₂ 2020 Interactive Globe (Streamlit Cloud 最終安定・プリセット視点版) ===
 import streamlit as st
 import numpy as np
 import xarray as xr
@@ -21,10 +21,10 @@ st.markdown("""
 # ---------------------------
 @st.cache_data
 def load_data():
-    file_path = "data/fd9c5180844360480e5575ed69dc8799.nc"  # 相対パスでOK
+    file_path = "data/fd9c5180844360480e5575ed69dc8799.nc"  # 相対パス
     ds = xr.open_dataset(file_path)
 
-    # CO₂変数を検出
+    # CO₂ 変数を検出
     for varname in ["co2", "xco2", "tcco2"]:
         if varname in ds.data_vars:
             co2 = ds[varname]
@@ -34,8 +34,8 @@ def load_data():
 
     # 軸名の違いを吸収
     time_key = "time" if "time" in ds.coords else "valid_time"
-    lat_key = "latitude" if "latitude" in ds.coords else "lat"
-    lon_key = "longitude" if "longitude" in ds.coords else "lon"
+    lat_key  = "latitude" if "latitude" in ds.coords else "lat"
+    lon_key  = "longitude" if "longitude" in ds.coords else "lon"
 
     return ds, co2, time_key, lat_key, lon_key
 
@@ -46,11 +46,11 @@ except Exception as e:
     st.stop()
 
 # ---------------------------
-# 🧭 座標情報
+# 🧭 座標情報 & 球面座標
 # ---------------------------
 times = ds[time_key]
-lats = ds[lat_key]
-lons = ds[lon_key]
+lats  = ds[lat_key]
+lons  = ds[lon_key]
 
 lon_grid, lat_grid = np.meshgrid(lons, lats)
 X = np.cos(np.deg2rad(lat_grid)) * np.cos(np.deg2rad(lon_grid))
@@ -85,12 +85,11 @@ def load_coastline():
                 x, y = poly.exterior.xy
                 coast_x += list(x) + [None]
                 coast_y += list(y) + [None]
-    # numpy変換
+    # numpy 変換（None→NaN）
     coast_x = np.array([np.nan if x is None else x for x in coast_x], dtype=float)
     coast_y = np.array([np.nan if y is None else y for y in coast_y], dtype=float)
     return coast_x, coast_y
 
-# --- 有効座標を抽出して球面変換 ---
 coast_x, coast_y = load_coastline()
 valid_mask = np.isfinite(coast_x) & np.isfinite(coast_y)
 coast_x_valid = coast_x[valid_mask]
@@ -107,15 +106,30 @@ coast_trace = go.Scatter3d(
 )
 
 # ---------------------------
-# 🎨 カラースケール設定
+# 🎚️ UI（サイドバー）: カラースケール & 視点プリセット
 # ---------------------------
-vmin, vmax = np.nanpercentile(co2.values, [2, 98])
 colorscale = st.sidebar.selectbox("カラースケール", ["Turbo", "Viridis", "Plasma", "RdYlGn_r"])
 
+view_option = st.sidebar.selectbox(
+    "視点プリセット",
+    ["Global (Default)", "Asia-Pacific", "Europe-Africa", "Americas"]
+)
+# 各プリセットに応じたカメラ位置（eye）
+camera_presets = {
+    "Global (Default)": dict(eye=dict(x=1.5,  y=1.5,  z=1.2)),
+    "Asia-Pacific":     dict(eye=dict(x=-2.0, y= 2.0,  z=1.0)),
+    "Europe-Africa":    dict(eye=dict(x=0.0,  y= 2.0,  z=1.2)),
+    "Americas":         dict(eye=dict(x=2.0,  y=-1.5, z=1.2)),
+}
+camera_eye = camera_presets[view_option]["eye"]
+
+# カラーレンジ（外れ値に頑健）
+vmin, vmax = np.nanpercentile(co2.values, [2, 98])
+
 # ---------------------------
-# 🌫️ Surface生成関数
+# 🌫️ Surface 生成関数
 # ---------------------------
-def make_surface(month_idx):
+def make_surface(month_idx: int) -> go.Surface:
     co2_frame = co2.isel({time_key: month_idx}).values
     return go.Surface(
         x=X, y=Y, z=Z,
@@ -129,21 +143,11 @@ def make_surface(month_idx):
     )
 
 # ---------------------------
-# 🎚️ 月スライダーで切替（再生なし・視点保持）
+# 📅 月スライダー（再生なし・視点はプリセットで初期化）
 # ---------------------------
-
 month_idx = st.slider("表示月 (1–12)", 1, co2.sizes[time_key], 1, step=1) - 1
 
-# ✅ カメラ位置をセッションに保持
-if "camera" not in st.session_state:
-    st.session_state.camera = dict(
-        up=dict(x=0, y=0, z=1),
-        center=dict(x=0, y=0, z=0),
-        eye=dict(x=1.5, y=1.5, z=1.2)
-    )
-
 fig = go.Figure(data=[make_surface(month_idx), coast_trace])
-
 fig.update_layout(
     title=f"🌍 CAMS Global CO₂ Concentration — Month {month_idx+1}",
     width=1100, height=750,
@@ -153,12 +157,16 @@ fig.update_layout(
         zaxis=dict(visible=False),
         aspectmode="data",
         bgcolor="white",
-        camera=st.session_state.camera  # ← ここが保持ポイント！
+        camera=dict(  # ← プリセットを初期視点に適用（回転・ズーム操作はそのまま可）
+            up=dict(x=0, y=0, z=1),
+            center=dict(x=0, y=0, z=0),
+            eye=camera_eye
+        )
     ),
     margin=dict(l=40, r=40, t=60, b=20)
 )
 
-# カラーバー
+# カラーバー調整（全 Surface に適用）
 fig.update_traces(
     colorbar_title="CO₂ (ppm)",
     selector=dict(type="surface"),
@@ -166,7 +174,7 @@ fig.update_traces(
     colorbar_x=1.05
 )
 
-# 出典
+# 出典ラベル
 fig.add_annotation(
     text="Data Source: Copernicus Atmosphere Monitoring Service (CAMS), ECMWF (2020)",
     xref="paper", yref="paper",
@@ -175,12 +183,5 @@ fig.add_annotation(
     align="center"
 )
 
-# ✅ カメラ更新イベント
-# StreamlitではJavaScriptイベントを直接受け取れないため、
-# ユーザー操作後のcameraを反映するトリガーとしてボタンを追加する。
-if st.button("🧭 現在の視点を保持（ズーム・回転後に押す）"):
-    st.session_state.camera = fig.layout.scene.camera
-    st.success("✅ 現在のカメラ視点を固定しました。")
-
-# 表示
+# 表示（1回だけ）
 st.plotly_chart(fig, use_container_width=True)
