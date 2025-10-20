@@ -31,11 +31,16 @@ except Exception as e:
 lat_name = [k for k in da.coords if "lat" in k.lower()][0]
 lon_name = [k for k in da.coords if "lon" in k.lower()][0]
 
-# 時間軸処理
+# 時間軸対応
 if "time" in da.dims:
-    t_index = st.sidebar.slider("Time index", 0, len(da["time"]) - 1, 0)
-    frame = da.isel(time=t_index)
-    time_label = str(pd.to_datetime(da["time"].values[t_index]))
+    display_mode = st.sidebar.radio("Display mode", ["Select month", "Annual mean"])
+    if display_mode == "Select month":
+        t_index = st.sidebar.slider("Month index", 0, len(da["time"]) - 1, 0)
+        frame = da.isel(time=t_index)
+        time_label = str(pd.to_datetime(da["time"].values[t_index]))
+    else:
+        frame = da.mean(dim="time")
+        time_label = "Annual mean"
 else:
     frame = da
     time_label = "Static data"
@@ -43,12 +48,7 @@ else:
 # 欠損値を補完
 data_2d = np.nan_to_num(frame.values)
 
-# shape確認
-if data_2d.ndim != 2:
-    st.error(f"Data is not 2D (shape={data_2d.shape}). Cannot render as image.")
-    st.stop()
-
-# カラースケール
+# カラースケール選択
 color_scale = st.sidebar.selectbox("Color scale", ["Viridis", "Plasma", "Cividis", "Inferno"])
 
 # 描画
@@ -67,5 +67,6 @@ fig.update_layout(
 )
 
 st.plotly_chart(fig, use_container_width=True)
+
 st.markdown("---")
 st.caption("Data source: Copernicus Atmosphere Monitoring Service (CAMS) — ECMWF.")
