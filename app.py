@@ -1,4 +1,4 @@
-# === CAMS CO₂ 2020 Interactive Globe (地域選択 + キャッシュクリア + 安定ビルド) ===
+# === CAMS CO₂ 2020 Interactive Globe (地域選択 + カメラ固定 + 拡大対応) ===
 import streamlit as st
 import numpy as np
 import xarray as xr
@@ -103,15 +103,14 @@ vmin, vmax = np.nanpercentile(co2.values, [2, 98])
 colorscale = st.sidebar.selectbox("カラースケール", ["Turbo", "Viridis", "Plasma", "RdYlGn_r"])
 region = st.sidebar.selectbox("🌍 表示地域", ["Global", "Asia-Pacific", "Euro-Africa", "America"])
 
-# カメラプリセット
-if region == "Asia-Pacific":
-    camera_eye = dict(x=-1.8, y=2.2, z=1.3)
-elif region == "Euro-Africa":
-    camera_eye = dict(x=0.5, y=2.6, z=1.4)
-elif region == "America":
-    camera_eye = dict(x=2.6, y=-1.7, z=1.3)
-else:
-    camera_eye = dict(x=1.8, y=1.8, z=1.4)  # Global (拡大)
+# カメラプリセット（強制固定）
+camera_presets = {
+    "Asia-Pacific": dict(x=-1.8, y=2.2, z=1.3),
+    "Euro-Africa": dict(x=0.4, y=2.7, z=1.4),
+    "America": dict(x=2.8, y=-1.8, z=1.3),
+    "Global": dict(x=1.9, y=1.9, z=1.4)
+}
+camera_eye = camera_presets.get(region, camera_presets["Global"])
 
 # ---------------------------
 # 🌫️ Surface生成関数
@@ -128,10 +127,11 @@ def make_surface(idx):
 # 🎚️ 月スライダー
 # ---------------------------
 month = st.slider("表示月 (1–12)", 1, co2.sizes[time_key], 1, step=1) - 1
+
 fig = go.Figure(data=[make_surface(month), coast_trace])
 fig.update_layout(
     title=f"🌍 CAMS CO₂ Concentration — {region} — Month {month+1}",
-    width=1150, height=800,
+    width=1200, height=850,
     scene=dict(
         xaxis=dict(visible=False),
         yaxis=dict(visible=False),
@@ -140,23 +140,23 @@ fig.update_layout(
         bgcolor="white",
         camera=dict(up=dict(x=0, y=0, z=1),
                     center=dict(x=0, y=0, z=0),
-                    eye=camera_eye)
+                    eye=camera_eye)  # ← 強制適用
     ),
     margin=dict(l=40, r=40, t=60, b=20)
 )
 
+# カラーバーと出典
 fig.update_traces(colorbar_title="CO₂ (ppm)",
                   selector=dict(type="surface"),
                   colorbar_len=0.7,
                   colorbar_x=1.05)
-
-fig.add_annotation(text="Data Source: Copernicus Atmosphere Monitoring Service (CAMS), ECMWF (2020)",
-                   xref="paper", yref="paper",
-                   x=0.5, y=-0.08, showarrow=False,
-                   font=dict(size=11, color="gray"),
-                   align="center")
+fig.add_annotation(
+    text="Data Source: Copernicus Atmosphere Monitoring Service (CAMS), ECMWF (2020)",
+    xref="paper", yref="paper", x=0.5, y=-0.08, showarrow=False,
+    font=dict(size=11, color="gray"), align="center"
+)
 
 # ---------------------------
-# 📺 Streamlitで表示
+# 📺 表示
 # ---------------------------
 st.plotly_chart(fig, use_container_width=True)
