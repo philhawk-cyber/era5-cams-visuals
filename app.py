@@ -72,21 +72,16 @@ def load_coastline():
                 x, y = poly.exterior.xy
                 coast_x += list(x) + [None]
                 coast_y += list(y) + [None]
-    return np.array(coast_x), np.array(coast_y)
+    # numpy配列に変換（None→NaNへ）
+    coast_x = np.array([np.nan if x is None else x for x in coast_x], dtype=float)
+    coast_y = np.array([np.nan if y is None else y for y in coast_y], dtype=float)
+    return coast_x, coast_y
 
+# --- ↓修正版：None判定とNaN除去 ---
 coast_x, coast_y = load_coastline()
-coast_x_valid = coast_x[np.isfinite(coast_x)]
-coast_y_valid = coast_y[np.isfinite(coast_y)]
-
-coast_X = np.cos(np.deg2rad(coast_y_valid)) * np.cos(np.deg2rad(coast_x_valid))
-coast_Y = np.cos(np.deg2rad(coast_y_valid)) * np.sin(np.deg2rad(coast_x_valid))
-coast_Z = np.sin(np.deg2rad(coast_y_valid))
-
-coast_trace = go.Scatter3d(
-    x=coast_X, y=coast_Y, z=coast_Z,
-    mode="lines", line=dict(color="black", width=0.8),
-    showlegend=False
-)
+valid_mask = np.isfinite(coast_x) & np.isfinite(coast_y)
+coast_x_valid = coast_x[valid_mask]
+coast_y_valid = coast_y[valid_mask]
 
 # --- カラースケール設定 ---
 vmin, vmax = np.nanpercentile(co2.values, [2, 98])
