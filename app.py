@@ -122,15 +122,9 @@ def make_surface(month_idx):
         surfacecolor=co2_frame,
         colorscale=colorscale,
         cmin=vmin, cmax=vmax,
-        showscale=True,
-        colorbar=dict(
-            title="CO₂ (ppm)",
-            titleside="right",
-            tickfont=dict(size=10),
-            len=0.7,
-            x=1.05
-        ),
-        lighting=dict(ambient=1.0, diffuse=0.0, specular=0.0, roughness=1.0, fresnel=0.0),
+        showscale=True,   # ← カラーバーはON
+        lighting=dict(ambient=1.0, diffuse=0.0, specular=0.0,
+                      roughness=1.0, fresnel=0.0),
         opacity=1.0
     )
 
@@ -203,6 +197,14 @@ fig.update_layout(
         ),
         steps=slider_steps
     )],
+)
+
+# カラーバー全体の外観を調整
+fig.update_traces(
+    colorbar_title="CO₂ (ppm)",
+    selector=dict(type="surface"),
+    colorbar_len=0.7,
+    colorbar_x=1.05
 )
 
 # ---------------------------
